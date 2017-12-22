@@ -57,6 +57,7 @@ class Config(object):
         CfgParam('OS_USERNAME', None, six.text_type),
         CfgParam('OS_PASSWORD', None, six.text_type),
         CfgParam('OS_TENANT_NAME', None, six.text_type),
+        CfgParam('OS_TOKEN', None, six.text_type),
         CfgParam('VERBOSE', False, bool),
         CfgParam('LIBVIRT_METER_ENABLED', False, bool),
 
