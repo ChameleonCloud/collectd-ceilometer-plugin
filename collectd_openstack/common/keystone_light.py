@@ -46,18 +46,21 @@ class ClientV3(object):
 
     :param string username: Username for authentication.
     :param string password: Password for authentication.
+    :param string tenant_id: Tenant id.
     :param string tenant_name: Tenant name.
     :param string auth_url: Keystone service endpoint for authorization.
 
     """
 
-    def __init__(self, auth_url, username, password, tenant_name):
+    def __init__(self, auth_url, username, password=None, tenant_id=None, tenant_name=None, token=None):
         """Initialize a new client"""
 
         self.auth_url = auth_url
         self.username = username
         self.password = password
+        self.tenant_id = tenant_id
         self.tenant_name = tenant_name
+        self.token = token
         self._auth_token = None
         self._services = ()
         self._services_by_name = {}
@@ -78,26 +81,38 @@ class ClientV3(object):
         """Refresh token and services list (getting it from identity server) """
         headers = {'Accept': 'application/json'}
         url = self.auth_url.rstrip('/') + '/auth/tokens'
+        if self.token:
+            identity_params = {
+                'methods': ['token'],
+                'token': {
+                    'id': self.token
+                }
+            }
+        else:
+            identity_params = {
+                'methods': ['password'],
+                'password': {
+                    'user': {
+                        'name': self.username,
+                        'domain': {'id': 'default'},
+                        'password': self.password
+                    }
+                }
+            }
         params = {
             'auth': {
-                'identity': {
-                    'methods': ['password'],
-                    'password': {
-                        'user': {
-                            'name': self.username,
-                            'domain': {'id': 'default'},
-                            'password': self.password
-                        }
-                    }
-                },
+                'identity': identity_params,
                 'scope': {
                     'project': {
-                        'name': self.tenant_name,
                         'domain': {'id': 'default'}
                     }
                 }
             }
         }
+        if self.tenant_name:
+            params['auth']['scope']['project']['name'] = self.tenant_name
+        else:
+            params['auth']['scope']['project']['id'] = self.tenant_id
 
         resp = requests.post(url, json=params, headers=headers)
         resp_data = None
