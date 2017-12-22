@@ -42,7 +42,7 @@ class Meter(object):
 
     def resource_id(self, vl):
         """Get resource ID."""
-        resources = [self.hostname(vl), vl.plugin, vl.plugin_instance]
+        resources = [vl.plugin, vl.plugin_instance]
         return '-'.join([i for i in resources if i])
 
     def unit(self, vl):
