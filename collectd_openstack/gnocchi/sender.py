@@ -37,12 +37,38 @@ class Sender(common_sender.Sender):
         """
         super(Sender, self).__init__()
         self._meter_ids = {}
+        self.resource_id = None
 
     def _on_authenticated(self):
         # get the uri of service endpoint
-        endpoint = self._get_endpoint("gnocchi")
+        self.region = self._get_region()
+        endpoint = self._get_endpoint("gnocchi", self.region)
+        node_uuid = self._get_node_uuid()
 
         self._url_base = "{}/v1/metric/%s/measures".format(endpoint)
+        self.resource_id = self._get_resource(node_uuid, endpoint)
+        LOGGER.debug("Resource %s does not exist, creating it now", node_uuid)
+        if self.resource_id is None:
+            self.resource_id = self._create_resource(node_uuid, endpoint)
+
+    def _get_region(self):
+        url = 'http://169.254.169.254/openstack/latest/vendor_data.json'
+        try:
+            result = self._perform_request(url, None, self._auth_token, req_type="get")
+            region = json.loads(result.text)['region']
+        except:
+            region = None
+        return region
+
+    def _get_node_uuid(self):
+        url = 'http://169.254.169.254/openstack/latest/meta_data.json'
+        try:
+            result = self._perform_request(url, None, self._auth_token, req_type="get")
+            node_uuid = json.loads(result.text)['uuid']
+            LOGGER.debug("node_uuid=%s", node_uuid)
+        except:
+            node_uuid = None
+        return node_uuid
 
     def _create_request_url(self, metername, **kwargs):
         unit = kwargs['unit']
@@ -77,11 +103,12 @@ class Sender(common_sender.Sender):
         else:
             raise exc
 
-    def _get_endpoint(self, service):
+    def _get_endpoint(self, service, region=None):
         # get the uri of service endpoint
         endpoint = self._keystone.get_service_endpoint(
             service,
-            Config.instance().CEILOMETER_URL_TYPE)
+            Config.instance().CEILOMETER_URL_TYPE,
+            region=region)
         return endpoint
 
     def _get_metric_id(self, metername, unit):
@@ -92,18 +119,55 @@ class Sender(common_sender.Sender):
             LOGGER.warn(ke)
             LOGGER.warn('No known ID for %s', metername)
 
-            endpoint = self._get_endpoint("gnocchi")
-            self._meter_ids[metername] = \
-                self._create_metric(metername, endpoint, unit)
+            endpoint = self._get_endpoint("gnocchi", region=self.region)
+            metric_id = self._get_metric(metername, endpoint, unit)
+            if metric_id is not None:
+                self._meter_ids[metername] = metric_id
+            else:
+                self._meter_ids[metername] = self._create_metric(metername, endpoint, unit)
 
         return self._meter_ids[metername]
 
+    def _get_metric(self, metername, endpoint, unit):
+        if self.resource_id is None:
+            return None
+        url = "{}/v1/resource/generic/{}/metric/".format(endpoint, self.resource_id)
+        try:
+            result = self._perform_request(url, None, self._auth_token, req_type="get")
+            metrics = json.loads(result.text)
+            metrics = [m for m in metrics if m['name'] == metername and m['unit'] == unit]
+            metric_id = metrics[0]['id']
+        except:
+            metric_id = None
+        return metric_id
+
     def _create_metric(self, metername, endpoint, unit):
-        url = "{}/v1/metric/".format(endpoint)
-        payload = json.dumps({"name": metername,
-                              "unit": unit,
-                              })
+        if self.resource_id is None:
+            return None
+        url = "{}/v1/resource/generic/{}/metric/".format(endpoint, self.resource_id)
+        payload = json.dumps({metername: {"archive_policy_name": "high", "unit": unit}})
         result = self._perform_request(url, payload, self._auth_token)
         metric_id = json.loads(result.text)['id']
         LOGGER.debug("metric_id=%s", metric_id)
         return metric_id
+
+    def _get_resource(self, resource_id, endpoint):
+        url = "{}/v1/resource/generic/{}".format(endpoint, resource_id)
+        try:
+            result = self._perform_request(url, None, self._auth_token, req_type="get")
+            resource_id = json.loads(result.text)['id']
+            LOGGER.debug("resource_id=%s", resource_id)
+        except:
+            resource_id = None
+        return resource_id
+
+    def _create_resource(self, resource_id, endpoint):
+        url = "{}/v1/resource/generic".format(endpoint)
+        payload = json.dumps({"id": resource_id})
+        try:
+            result = self._perform_request(url, payload, self._auth_token)
+            resource_id = json.loads(result.text)['id']
+            LOGGER.debug("resource_id=%s", resource_id)
+        except:
+            resource_id = None
+        return resource_id
