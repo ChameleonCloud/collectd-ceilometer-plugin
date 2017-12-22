@@ -97,12 +97,33 @@ class Sender(object):
                 # create a keystone client if it doesn't exist
                 if self._keystone is None:
                     cfg = Config.instance()
-                    self._keystone = ClientV3(
-                        auth_url=cfg.OS_AUTH_URL,
-                        username=cfg.OS_USERNAME,
-                        password=cfg.OS_PASSWORD,
-                        tenant_name=cfg.OS_TENANT_NAME
-                    )
+                    try:
+                        r = requests.get('http://169.254.169.254/openstack/latest/vendor_data.json')
+                        vendor_data = r.json()
+                        token = vendor_data['instance_metrics_writer_token']
+                        auth_url = vendor_data['auth_url_v3']
+                        project_id = vendor_data['project_id']
+                    except Exception as exc:
+                        log_level = logging.ERROR
+                        LOGGER.log(log_level, 'Failed to get token from vendor data: %s',
+                                   six.text_type(exc),
+                                   exc_info=0)
+                        token = None
+
+                    if token:
+                        self._keystone = ClientV3(
+                            auth_url=auth_url,
+                            username=cfg.OS_USERNAME,
+                            token=token,
+                            tenant_id=project_id
+                        )
+                    else:
+                        self._keystone = ClientV3(
+                            auth_url=cfg.OS_AUTH_URL,
+                            username=cfg.OS_USERNAME,
+                            password=cfg.OS_PASSWORD,
+                            tenant_name=cfg.OS_TENANT_NAME
+                        )
                 # store the authentication token
                 self._auth_token = self._keystone.auth_token
 
