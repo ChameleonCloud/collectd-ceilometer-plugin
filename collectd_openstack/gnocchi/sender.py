@@ -30,20 +30,19 @@ ROOT_LOGGER = logging.getLogger(collectd_openstack.__name__)
 class Sender(common_sender.Sender):
     """Sends the JSON serialized data to Gnocchi"""
 
-    def __init__(self):
+    def __init__(self, meter_type):
         """Create the Sender instance.
 
         The configuration must be initialized before the object is created.
         """
         super(Sender, self).__init__()
         self._meter_ids = {}
-        self.resource_id = None
-        self.meter_type = 'generic'
-
-    def set_meter_type(self, _type):
-        self.meter_type = _type
+        self.meter_type = meter_type
+        self.resource_id = self._set_resource_id()
 
     def _set_resource_id(self):
+        self.region = self._get_region()
+        endpoint = self._get_endpoint("gnocchi", self.region)
         node_uuid = self._get_node_uuid()
         self.resource_id = self._get_resource(node_uuid, endpoint)
         LOGGER.debug("Resource %s does not exist, creating it now", node_uuid)
@@ -149,7 +148,7 @@ class Sender(common_sender.Sender):
             return None
 
         url = "{}/v1/resource/{}/{}/metric/".format(
-            endpoint, meter_type, self.resource_id)
+            endpoint, self.meter_type, self.resource_id)
         try:
             result = self._perform_request(
                 url, None, self._auth_token, req_type="get")
@@ -162,7 +161,7 @@ class Sender(common_sender.Sender):
             metric_id = None
         return metric_id
 
-    def _create_metric(self, metername, endpoint, unit, meter_type='generic'):
+    def _create_metric(self, metername, endpoint, unit):
         if self.resource_id is None:
             return None
 
