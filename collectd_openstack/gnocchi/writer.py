@@ -60,6 +60,9 @@ class Writer(object):
         metername = "{}@{}".format(
             plugin.resource_id(vl), plugin.meter_name(vl))
 
+        if 'cuda' in metername:
+            self._sender.set_meter_type('cuda')
+
         unit = plugin.unit(vl)
         timestamp = datetime.datetime.utcfromtimestamp(vl.time).isoformat()
 
