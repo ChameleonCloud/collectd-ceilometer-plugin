@@ -33,7 +33,7 @@ class Sender(common_sender.Sender):
     def __init__(self):
         """Create the Sender instance.
 
-        The cofinguration must be initialized before the object is created.
+        The configuration must be initialized before the object is created.
         """
         super(Sender, self).__init__()
         self._meter_ids = {}
@@ -43,17 +43,19 @@ class Sender(common_sender.Sender):
     def set_meter_type(self, _type):
         self.meter_type = _type
 
-    def _on_authenticated(self):
-        # get the uri of service endpoint
-        self.region = self._get_region()
-        endpoint = self._get_endpoint("gnocchi", self.region)
+    def _set_resource_id(self):
         node_uuid = self._get_node_uuid()
-
-        self._url_base = "{}/v1/metric/%s/measures".format(endpoint)
         self.resource_id = self._get_resource(node_uuid, endpoint)
         LOGGER.debug("Resource %s does not exist, creating it now", node_uuid)
         if self.resource_id is None:
             self.resource_id = self._create_resource(node_uuid, endpoint)
+
+    def _on_authenticate(self):
+        # get the uri of service endpoint
+        self.region = self._get_region()
+        endpoint = self._get_endpoint("gnocchi", self.region)
+
+        self._url_base = "{}/v1/metric/%s/measures".format(endpoint)
 
     def _get_region(self):
         url = 'http://169.254.169.254/openstack/latest/vendor_data.json'
@@ -84,6 +86,7 @@ class Sender(common_sender.Sender):
 
     def _create_request_url(self, metername, **kwargs):
         unit = kwargs['unit']
+        self._set_resource_id()
         metric_id = self._get_metric_id(metername, unit)
         return self._url_base % (metric_id)
 
