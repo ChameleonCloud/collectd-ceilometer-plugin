@@ -38,23 +38,18 @@ class Sender(common_sender.Sender):
         super(Sender, self).__init__()
         self._meter_ids = {}
         self.meter_type = meter_type
-        self.resource_id = self._set_resource_id()
-
-    def _set_resource_id(self):
-        self.region = self._get_region()
-        endpoint = self._get_endpoint("gnocchi", self.region)
-        node_uuid = self._get_node_uuid()
-        self.resource_id = self._get_resource(node_uuid, endpoint)
-        LOGGER.debug("Resource %s does not exist, creating it now", node_uuid)
-        if self.resource_id is None:
-            self.resource_id = self._create_resource(node_uuid, endpoint)
 
     def _on_authenticate(self):
         # get the uri of service endpoint
         self.region = self._get_region()
         endpoint = self._get_endpoint("gnocchi", self.region)
-
+        node_uuid = self._get_node_uuid()
         self._url_base = "{}/v1/metric/%s/measures".format(endpoint)
+
+        self.resource_id = self._get_resource(node_uuid, endpoint)
+        LOGGER.debug("Resource %s does not exist, creating it now", node_uuid)
+        if self.resource_id is None:
+            self.resource_id = self._create_resource(node_uuid, endpoint)
 
     def _get_region(self):
         url = 'http://169.254.169.254/openstack/latest/vendor_data.json'
@@ -85,7 +80,6 @@ class Sender(common_sender.Sender):
 
     def _create_request_url(self, metername, **kwargs):
         unit = kwargs['unit']
-        self._set_resource_id()
         metric_id = self._get_metric_id(metername, unit)
         return self._url_base % (metric_id)
 

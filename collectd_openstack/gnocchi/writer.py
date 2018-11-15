@@ -102,7 +102,7 @@ class Writer(object):
         # gnocchi samples
         payload = json.dumps([sample.to_payload() for sample in to_send])
 
-        if 'cuda' in metername:
+        if 'cuda' in str(metername):
             self.cuda_sender.send(metername, payload, unit=unit)
         else:
             self.generic_sender.send(metername, payload, unit=unit)
