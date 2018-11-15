@@ -39,7 +39,7 @@ class Sender(common_sender.Sender):
         self._meter_ids = {}
         self.meter_type = meter_type
 
-    def _on_authenticate(self):
+    def _on_authenticated(self):
         # get the uri of service endpoint
         self.region = self._get_region()
         endpoint = self._get_endpoint("gnocchi", self.region)
@@ -47,8 +47,9 @@ class Sender(common_sender.Sender):
         self._url_base = "{}/v1/metric/%s/measures".format(endpoint)
 
         self.resource_id = self._get_resource(node_uuid, endpoint)
-        LOGGER.debug("Resource %s does not exist, creating it now", node_uuid)
         if self.resource_id is None:
+            LOGGER.debug(
+                "Resource %s does not exist, creating it now", node_uuid)
             self.resource_id = self._create_resource(node_uuid, endpoint)
 
     def _get_region(self):
