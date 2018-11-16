@@ -44,7 +44,8 @@ class Writer(object):
     def __init__(self, meters, config):
         self._meters = meters
         self._samples = SampleContainer()
-        self._sender = gnocchi_sender.Sender()
+        self.generic_sender = gnocchi_sender.Sender('generic')
+        self.cuda_sender = gnocchi_sender.Sender('cuda')
         self._config = config
 
     def write(self, vl, data):
@@ -100,4 +101,8 @@ class Writer(object):
 
         # gnocchi samples
         payload = json.dumps([sample.to_payload() for sample in to_send])
-        self._sender.send(metername, payload, unit=unit)
+
+        if 'cuda' in str(metername):
+            self.cuda_sender.send(metername, payload, unit=unit)
+        else:
+            self.generic_sender.send(metername, payload, unit=unit)
