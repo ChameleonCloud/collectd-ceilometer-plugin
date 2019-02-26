@@ -98,8 +98,13 @@ class Sender(object):
                 if self._keystone is None:
                     cfg = Config.instance()
                     try:
-                        r = requests.get('http://169.254.169.254/openstack/latest/vendor_data.json')
+                        r = requests.get('http://169.254.169.254/openstack/latest/vendor_data2.json')
                         vendor_data = r.json()
+                        if 'chameleon' in vendor_data:
+                            vendor_data = vendor_data['chameleon']
+                        else:
+                            r = requests.get('http://169.254.169.254/openstack/latest/vendor_data.json')
+                            vendor_data = r.json()
                         token = vendor_data['instance_metrics_writer_token']
                         auth_url = vendor_data['auth_url_v3']
                         project_id = vendor_data['project_id']
