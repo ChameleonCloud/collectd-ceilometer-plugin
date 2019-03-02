@@ -53,11 +53,19 @@ class Sender(common_sender.Sender):
             self.resource_id = self._create_resource(node_uuid, endpoint)
 
     def _get_region(self):
-        url = 'http://169.254.169.254/openstack/latest/vendor_data.json'
         try:
+            url = 'http://169.254.169.254/openstack/latest/vendor_data2.json'
             result = self._perform_request(
                 url, None, self._auth_token, req_type="get")
-            region = json.loads(result.text)['region']
+            result_json = result.json()
+            if 'chameleon' in result_json:
+                result_json = result_json['chameleon']
+            else:
+                url = 'http://169.254.169.254/openstack/latest/vendor_data.json'
+                result = self._perform_request(
+                    url, None, self._auth_token, req_type="get")
+                result_json = result.json()
+            region = result_json['region']
         except Exception:
             region = None
         return region
@@ -65,7 +73,7 @@ class Sender(common_sender.Sender):
     def _get_node_uuid(self):
 
         if self.meter_type == 'cuda':
-            url = 'http://169.254.169.254/openstack/latest/vendor_data.json'
+            url = 'http://169.254.169.254/openstack/latest/vendor_data2.json'
             key = 'node'
         else:
             url = 'http://169.254.169.254/openstack/latest/meta_data.json'
@@ -73,7 +81,15 @@ class Sender(common_sender.Sender):
         try:
             result = self._perform_request(
                 url, None, self._auth_token, req_type="get")
-            node_uuid = json.loads(result.text)[key]
+            result_json = result.json()
+            if key == 'node':
+                if 'chameleon' in result_json:
+                    result_json = result_json['chameleon']
+                else:
+                    result = self._perform_request(
+                        'http://169.254.169.254/openstack/latest/vendor_data.json', None, self._auth_token, req_type="get")
+                    result_json = result.json()
+            node_uuid = result_json[key]
             LOGGER.debug("node_uuid=%s", node_uuid)
         except Exception:
             node_uuid = None
